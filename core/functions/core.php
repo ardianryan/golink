@@ -1,0 +1,186 @@
+<?php
+use Core\Helper;
+use Core\View;
+
+/**
+ * Autoload Core files
+ * @version 1.0
+ * @param   [type] $class [description]
+ * @return  [type]        [description]
+ */
+function autoloadCore($class){
+  if(strpos($class, "\\")) {
+    $data = explode("\\", $class);
+    $namespace = strtolower($data[0]);
+    $name = end($data);
+  
+    if(!in_array($namespace, ["core","models", "middleware", "helpers", "traits", "plugins","themes"])) return;
+    
+    if($namespace == "core"){
+      $filename = ROOT."/".$namespace;
+    } elseif($namespace == "plugins" || $namespace == "themes"){
+      $filename = ROOT."/storage/".$namespace;
+    } else {
+      $filename = APP."/".$namespace; 
+    }
+
+    array_pop($data);    
+    foreach ($data as $i => $file ) {
+      if($i == 0) continue;
+      $filename .= "/".strtolower($file);
+    }
+
+    $filename .= "/".$name;
+    if($namespace == "core") $filename .= ".class";
+
+    $filename .= ".php";
+
+    if (is_readable($filename)) {
+      require($filename);
+    } 
+  }
+}
+spl_autoload_register("autoloadCore");
+
+/**
+ * Autoload Controllers
+ * @version 1.0
+ * @param   [type] $class [description]
+ * @return  [type]        [description]
+ */
+function autoloadController($class){
+  
+  if(strpos($class, "\\")) {
+    $data = explode("\\", $class);
+    $name = end($data);    
+    $filename = CONTROLLER. "/";
+    array_pop($data);
+    foreach ($data as $namespace) {
+      $filename .= strtolower($namespace)."/";
+    }
+    $filename .= $name."Controller.php";
+  } else {
+    $filename = CONTROLLER. "/" . $class . "Controller.php";
+  }
+
+  if (is_readable($filename)) {
+    require($filename);
+  }
+}
+spl_autoload_register("autoloadController");
+
+/**
+ * Custom Error Handler
+ * @version 1.0
+ * @param   string $errno  
+ * @param   string $errstr 
+ * @param   string $errfile
+ * @param   string $errline
+ */
+function GemError($errno, $errstr, $errfile, $errline) {
+  return GemError::exception($errno, $errstr, $errfile, $errline);
+}  
+
+set_error_handler("GemError", E_ALL);
+
+/**
+ * Capture Fatal Error
+ * @version 1.0
+ */
+function FatalError() {
+  $error = error_get_last();
+  if(isset($error["message"])) return GemError::log($error["message"]);
+}  
+register_shutdown_function("FatalError");
+
+/**
+ * Parse JSON
+ * @version 1.0
+ * @param   string $string
+ * @return  string        
+ */
+function parseIfJSON($string){
+
+  if(is_null($string) || empty($string) || is_numeric($string)) return $string;
+
+  $json = json_decode($string);
+
+  return (json_last_error() == JSON_ERROR_NONE) ? $json : $string;
+}
+/**
+ * Current Page
+ * @version 1.0
+ */
+function currentPage(){
+  // Get Page
+  if(isset($_GET["page"]) && is_numeric($_GET["page"]) && $_GET["page"]>0) {
+   return Helper::clean($_GET["page"]);    
+  }
+  return "1";
+}
+/**
+ * Clean String
+ *
+ * @version 6.0
+ * @param [type] $string
+ * @return void
+ */
+function clean($string){
+  return Helper::clean($string, 3, true);
+}
+
+/**
+ * Get Configuration
+ * @version 1.0
+ * @param   string|null $config [description]
+ * @return  [type]              [description]
+ */
+function config(?string $config = NULL){
+  
+  if(!class_exists('Gem')) return false;
+
+  if($config) return isset(Gem::$Config->{$config}) ? Gem::$Config->{$config} : false;
+
+  return Gem::$Config;
+}
+/**
+ * Get App Config in /config
+ * @version 7.2.3
+ * @param   string $path [description]
+ * @return  [type]       [description]
+ */
+function appConfig(string $path){
+
+  $file = explode('.', $path);
+
+  if(file_exists(APP.'/config/'.$file[0].'.php')){
+      $config = include(APP.'/config/'.$file[0].'.php'); 
+      Gem::$App['appConfig'][$file[0]] = $config;
+      if(isset($file[1]) && !empty($file[1]) && isset($config[$file[1]])) return $config[$file[1]];
+      return $config;
+  }
+
+  return false;
+}
+/**
+ * Return User
+ *
+ * @version 1.0
+ * @return void
+ */
+function user(){
+  return \Core\Auth::user();
+}
+/**
+ * Call Auth Class
+ *
+ * @version 6.4.1
+ * @param [type] $fn
+ * @param array $param
+ * @return void
+ */
+function auth($fn, $param = []){
+  return call_user_func('\Core\Auth::'.$fn, $param);
+}
+
+include('helpers.php');
